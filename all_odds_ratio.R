@@ -1,8 +1,8 @@
 # odds ratio all
 setwd("/nfs/turbo/umms-lgarmire2/Xiaotong/logit_tables")
 
-load("/nfs/turbo/umms-lgarmire2/Xiaotong/case_list_for_or.RData")
-load("/nfs/turbo/umms-lgarmire2/Xiaotong/control_list_for_or.RData")
+load("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/case_list_for_or.RData")
+load("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/control_list_for_or.RData")
 
 library(dplyr)
 target = c("HTN", "DMcx", "DM", "Renal", "Obesity", "Hypothyroid")
@@ -17,7 +17,7 @@ for(i in c(1:length(target))){
   }
   fit = glm(status ~ PE+PE_age+Caucasian+SmokingStatusMapped+
                 AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated +
-                Hypothyroidism + Obesity + RenalFailure + DiabetesUncomplicated + Caucasian,  family = binomial(link = "logit"), data = data1)
+                Hypothyroidism + Obesity + RenalFailure + DiabetesUncomplicated,  family = binomial(link = "logit"), data = data1)
   result = result %>% 
     bind_rows(data.frame(Comorbidity = target[i],
                          LogitCoef = summary(fit)$coefficients["PE", "Estimate"],
@@ -32,7 +32,7 @@ write.csv(result, file = "/nfs/turbo/umms-lgarmire2/Xiaotong/logit_tables/UM_res
 ###hypothyroid 4 years
 i = 6
 data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
-for(j in c(1:length(data1))){
+for(j in c(1:nrow(data1))){
   if(data1$surv_time[j]>365*10){
     data1$status[j] = 0
   }
@@ -65,7 +65,7 @@ result_caucasian = data.frame()
 for(i in c(1:length(target))){
   data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
   data1 = data1%>%filter(Caucasian==1)
-  for(j in c(1:length(data1))){
+  for(j in c(1:nrow(data1))){
     if(data1$surv_time[j]>3650){
       data1$status[j] = 0
     }
@@ -85,7 +85,7 @@ result_AA = data.frame()
 for(i in c(1:length(target))){
   data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
   data1 = data1%>%filter(`African American`==1)
-  for(j in c(1:length(data1))){
+  for(j in c(1:nrow(data1))){
     if(data1$surv_time[j]>3650){
       data1$status[j] = 0
     }
