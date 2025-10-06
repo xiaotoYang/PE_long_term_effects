@@ -1,11 +1,20 @@
 # odds ratio all
+# Xiaotong Yang 
+
+# calculates: 
+#1)Overall OR on UM dataset
+#2)OR by race on UM dataset
+#3)OR by PE severity on UM dataset
+#4)OR by fetal sex on UM dataset
+
+#`overall OR---------------------------------------------------------------------
 setwd("/nfs/turbo/umms-lgarmire2/Xiaotong/logit_tables")
 
 load("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/case_list_for_or.RData")
 load("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/control_list_for_or.RData")
 
 library(dplyr)
-target = c("HTN", "DMcx", "DM", "Renal", "Obesity", "Hypothyroid")
+target = c("HTN", "DMcx", "DM", "Renal", "Obesity")
 result = data.frame()
 
 for(i in c(1:length(target))){
@@ -17,7 +26,7 @@ for(i in c(1:length(target))){
   }
   fit = glm(status ~ PE+PE_age+Caucasian+SmokingStatusMapped+
                 AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated +
-                Hypothyroidism + Obesity + RenalFailure + DiabetesUncomplicated,  family = binomial(link = "logit"), data = data1)
+                Obesity + RenalFailure + DiabetesUncomplicated,  family = binomial(link = "logit"), data = data1)
   result = result %>% 
     bind_rows(data.frame(Comorbidity = target[i],
                          LogitCoef = summary(fit)$coefficients["PE", "Estimate"],
@@ -28,36 +37,6 @@ for(i in c(1:length(target))){
 
 result
 write.csv(result, file = "/nfs/turbo/umms-lgarmire2/Xiaotong/logit_tables/UM_result.csv")
-
-###hypothyroid 4 years
-i = 6
-data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
-for(j in c(1:nrow(data1))){
-  if(data1$surv_time[j]>365*10){
-    data1$status[j] = 0
-  }
-}
-fit = glm(status ~ PE+PE_age+Caucasian+SmokingStatusMapped+
-            AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated +
-            Hypothyroidism + Obesity + RenalFailure + DiabetesUncomplicated + Caucasian,  family = binomial(link = "logit"), data = data1)
-result = result%>%
-  bind_rows(data.frame(Comorbidity = target[i],
-                       LogitCoef = summary(fit)$coefficients["PE", "Estimate"],
-                       CoefStd = summary(fit)$coefficients["PE", "Std. Error"],
-                       LogitRegP = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
-result
-###hypothyroid ends---------------------------------------------------
-
-library(ggplot2)
-fig = ggplot(data=result, aes(y=Comorbidity, x=exp(LogitCoef), xmin=exp(LogitCoef-1.96*CoefStd), xmax=exp(LogitCoef+1.96*CoefStd))) +
-  theme_minimal()+
-  geom_errorbarh(height=.1)+
-  geom_point(color = "red") +
-  geom_vline(xintercept = 1, linetype = "dashed") +
-  labs(x = "Odds Ratio", y = "Complication")
-fig
-ggsave("/nfs/turbo/umms-lgarmire2/Xiaotong/figures/all_odds_ratio_UM.png", height = 4.8, width = 7.2, dpi = 600)
-#png(result_survival, file = "/nfs/turbo/umms-lgarmire2/Xiaotong/all_odds_ratio_UM.png")
 
 
 # OR by race--------------------------------------------------------
@@ -72,7 +51,7 @@ for(i in c(1:length(target))){
   }
   fit = glm(status ~ PE+PE_age+Caucasian+SmokingStatusMapped+
               AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated +
-              Hypothyroidism + Obesity + RenalFailure+ DiabetesUncomplicated ,  family = binomial(link = "logit"), data = data1)
+              Obesity + RenalFailure+ DiabetesUncomplicated ,  family = binomial(link = "logit"), data = data1)
   result_caucasian  = result_caucasian  %>% 
     bind_rows(data.frame(Comorbidity = target[i],
                          LogitCoef = summary(fit)$coefficients["PE", "Estimate"],
@@ -117,6 +96,8 @@ figure2 = ggplot(data=data, aes(y=Comorbidity, x=exp(LogitCoef), xmin=exp(LogitC
 figure2
 ggsave("/nfs/turbo/umms-lgarmire2/Xiaotong/figures/all_odds_ratio_race_UM.png", height = 4.8, width = 7.2, dpi = 600)
 
+
+# Odds ratio by PE severity----------------------------------------------------------
 library(icd)
 library(touch)
 library(tidyverse)
@@ -200,76 +181,118 @@ figure3
 
 ggsave("/nfs/turbo/umms-lgarmire2/Xiaotong/figures/HazardRatio_severity.png", height = 4.8, width = 7.2, dpi = 600)
 
-# recurrent pe ------------------------------------------
-# check how many patients have multiple pe
 
-recurrent_pe = read.csv("/nfs/turbo/umms-lgarmire2/Xiaotong/logit_tables/recurrent_pe_list.csv")
-final_recurrent_pe = case_survival_list$HTN%>%inner_join(recurrent_pe)#692 patients
-multiparous_control = read.csv("/nfs/turbo/umms-lgarmire2/Xiaotong/logit_tables/mulitparous.csv")
-final_multiparous_control = control_survival_list$HTN%>%inner_join(multiparous_control)#9765
-one_pe = read.csv("/nfs/turbo/umms-lgarmire2/Xiaotong/logit_tables/one_pe_list.csv")#885
-colnames(one_pe) = c("X", "DeID_PatientID")
-final_one_pe = case_survival_list$HTN%>%inner_join(one_pe)
-final_multi = case_survival_list$HTN%>%inner_join(multiparous)
 
-result_recurrent = data.frame()
+
+#calculate odds ratio for male/female baby-------------------------------------
+
+library(dplyr)
+#load previous OR data
+load("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/case_list_for_or.RData")
+load("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/control_list_for_or.RData")
+#load baby info
+baby_case = read.csv("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/baby_sex_and_sga/Stork_Pregnancy_Outcomes_case.csv")
+baby_control = read.csv("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/baby_sex_and_sga/Stork_Pregnancy_Outcomes_control.csv")
+#load sga info
+pe_sga = read.csv("baby_sex_and_sga/sga_baby_demogrpahics.csv")
+control_sga = read.csv("baby_sex_and_sga/control_baby_sga_demographics.csv")
+
+#join diagnosis record and delivery record-------------------------------------------------------------
+PE_patient = case_survival_list$HTN%>%
+  select(DeID_PatientID, start_time, PE_age)%>%
+  inner_join(baby_case)
+dim(PE_patient)  
+PE_patient$DeID_Delivery_Time = as.Date(PE_patient$DeID_Delivery_Time, format = "%m/%d/%Y %H:%M")
+
+#ensure baby record and maternal record are from the same pregnancy
+#by restrict PE onset time is at most 180 d before delivery and 30 d after delivery
+PE_patient = PE_patient%>%filter(DeID_Delivery_Time - start_time<180 & DeID_Delivery_Time - start_time>-30)
+dim(PE_patient)
+
+controls = control_survival_list$HTN%>%
+  select(DeID_PatientID, start_time, PE_age)%>%
+  inner_join(baby_control)
+dim(controls)  
+controls$DeID_Delivery_Time = as.Date(controls$DeID_Delivery_Time, format = "%m/%d/%Y %H:%M")
+
+#ensure baby record and maternal record are from the same pregnancy
+#by restrict PE onset time is at most 180 d before delivery and 30 d after delivery
+controls = controls%>%filter(DeID_Delivery_Time - start_time<300 & DeID_Delivery_Time - start_time>-30)
+dim(controls)
+
+write.csv(PE_patient$DeID_PatientID_Baby, file = "baby_sex_and_sga/PE_baby_list.csv", row.names = F)
+write.csv(controls$DeID_PatientID_Baby, file = "baby_sex_and_sga/control_baby_list.csv", row.names = F)
+twins_diff_gender <- PE_patient %>%
+  group_by(DeID_PatientID, DeID_Delivery_Time) %>%
+  filter(n() >= 2) %>%
+  filter(n_distinct(BABY_SEX) > 1) %>%
+  ungroup()
+
+twins_diff_gender_control <- controls %>%
+  group_by(DeID_PatientID, DeID_Delivery_Time) %>%
+  filter(n() >= 2) %>%
+  filter(n_distinct(BABY_SEX) > 1) %>%
+  ungroup()
+
+PE_no_twins = PE_patient%>%filter(!DeID_PatientID_Baby%in%twins_diff_gender$DeID_PatientID_Baby)
+control_no_twins =  controls%>%filter(!DeID_PatientID_Baby%in%twins_diff_gender_control$DeID_PatientID_Baby)
+
+target = c("HTN", "Renal")
+result_female_baby = data.frame()
 for(i in c(1:length(target))){
-  case = case_survival_list[[target[i]]]%>%inner_join(recurrent_pe)
-  control = control_survival_list[[target[i]]]%>%inner_join(multiparous_control)
-  data1 <- rbind(case, control)
-  for(j in c(1:length(data1))){
+  data1 <- rbind(case_survival_list[[target[i]]]%>%inner_join(PE_no_twins%>%filter(BABY_SEX=="FEMALE")%>%select(DeID_PatientID)), 
+                 control_survival_list[[target[i]]]%>%inner_join(control_no_twins%>%filter(BABY_SEX=="FEMALE")%>%select(DeID_PatientID)))
+  for(j in c(1:nrow(data1))){
     if(data1$surv_time[j]>3650){
       data1$status[j] = 0
     }
   }
   fit = glm(status ~ PE+PE_age+Caucasian+SmokingStatusMapped+
               AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated +
-              Hypothyroidism + Obesity + RenalFailure + DiabetesUncomplicated+Caucasian,  family = binomial(link = "logit"), data = data1)
-  result_recurrent  = result_recurrent %>% 
+              Hypothyroidism + Obesity + RenalFailure+ DiabetesUncomplicated ,  family = binomial(link = "logit"), data = data1)
+  result_female_baby  = result_female_baby  %>% 
     bind_rows(data.frame(Comorbidity = target[i],
                          LogitCoef = summary(fit)$coefficients["PE", "Estimate"],
                          CoefStd = summary(fit)$coefficients["PE", "Std. Error"],
                          LogitRegP = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
 }
+result_female_baby 
 
-result_nonrecurrent = data.frame()
-i=1
+result_male_baby = data.frame()
 for(i in c(1:length(target))){
-  case = case_survival_list[[target[i]]]%>%inner_join(one_pe)
-  control = control_survival_list[[target[i]]]%>%inner_join(multiparous_control)
-  data1 <- rbind(case, control_survival_list[[target[i]]])
-  for(j in c(1:length(data1))){
+  data1 <- rbind(case_survival_list[[target[i]]]%>%inner_join(PE_no_twins%>%filter(BABY_SEX=="MALE")%>%select(DeID_PatientID)), 
+                 control_survival_list[[target[i]]]%>%inner_join(control_no_twins%>%filter(BABY_SEX=="MALE")%>%select(DeID_PatientID)))
+  for(j in c(1:nrow(data1))){
     if(data1$surv_time[j]>3650){
       data1$status[j] = 0
     }
   }
-  fit = glm(status ~ PE+PE_age+Caucasian+SmokingStatusMapped+
+  fit = glm(status ~ PE+PE_age+Caucasian+SmokingStatusMapped+ DiabetesUncomplicated+
               AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated +
-              Hypothyroidism + Obesity + RenalFailure + DiabetesUncomplicated+Caucasian,  family = binomial(link = "logit"), data = data1)
-  result_nonrecurrent  = result_nonrecurrent %>% 
+              Hypothyroidism + Obesity + RenalFailure ,  family = binomial(link = "logit"), data = data1)
+  result_male_baby  = result_male_baby  %>% 
     bind_rows(data.frame(Comorbidity = target[i],
                          LogitCoef = summary(fit)$coefficients["PE", "Estimate"],
                          CoefStd = summary(fit)$coefficients["PE", "Std. Error"],
                          LogitRegP = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
 }
+result_male_baby
+write.csv(result_female_baby, file = "/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/baby_sex_and_sga/result_female_baby.csv")
+write.csv(result_male_baby, file = "/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/baby_sex_and_sga/result_male_baby.csv")
 
-result_nonrecurrent
-data = as.data.frame(rbind(result_recurrent,result_nonrecurrent))
-data$recurrent = c(rep("Recurrent PE", 6), rep("Multiparous, one PE", 6))
-data
-write.csv(data, file = "/nfs/turbo/umms-lgarmire2/Xiaotong/logit_tables/recurrent_pe_result.csv")
+data = as.data.frame(rbind(result_female_baby,result_male_baby))
+
+data$baby_sex = c(rep("Female", 6), rep("Male", 6))
 
 library(ggplot2)
-figure4 = ggplot(data=data, aes(y=Comorbidity, x=exp(LogitCoef), xmin=exp(LogitCoef-1.96*CoefStd), xmax=exp(LogitCoef+1.96*CoefStd), group = recurrent, color = recurrent)) +
+figure2 = ggplot(data=data, aes(y=Comorbidity, x=exp(LogitCoef), xmin=exp(LogitCoef-1.96*CoefStd), 
+                                xmax=exp(LogitCoef+1.96*CoefStd), color = baby_sex, group = baby_sex)) +
   theme_minimal()+
   geom_errorbarh(height=0.2, position = position_dodge(width = 0.5))+
   geom_pointrange(position = position_dodge(width = 0.5), size = 0.15) +
   geom_vline(xintercept = 1, linetype = "dashed") +
   labs(x = "Odds Ratio", y = "Comorbidity") +
   scale_x_continuous(breaks = c(1,2,4,6)) 
-figure4
-ggsave("/nfs/turbo/umms-lgarmire2/Xiaotong/figures/OR_recurrent.png", height = 4.8, width = 7.2, dpi = 600)
-
-
-
+figure2
+ggsave("/nfs/turbo/umms-lgarmire2/Xiaotong/PE_long_term_maternal_outcome/figures/baby_sex_OR.png", height = 3, width = 6, dpi = 600)
 

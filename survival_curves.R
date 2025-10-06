@@ -8,7 +8,7 @@ load("/nfs/turbo/umms-lgarmire2/Xiaotong/control_survival_list_XY_200dcomo.RData
 
 #All Patients-----------------------------------------------------------------------------------------
 #KM Curves
-target = c("HTN", "DMcx", "DM", "Renal", "Obesity", "Hypothyroid")
+target = c("HTN", "Renal", "DM","DMcx","Obesity")
 for(i in c(1:length(target))){
   data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
   data1 = data1%>%filter(surv_time<=3650)%>%mutate(surv_time = surv_time/365)
@@ -30,39 +30,9 @@ for(i in c(1:length(target))){
 
 
 
-#coxph and hazard ratio
-library(dplyr)
-result_survival = data.frame()
-for(i in c(1:length(target))){
-  data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
-  fit = coxph(Surv(surv_time, status) ~ PE+PE_age+Caucasian+SmokingStatusMapped+
-                AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated + 
-                Hypothyroidism + Obesity + RenalFailure + CongestiveHeartFailure, data = data1)
-  result_survival = result_survival %>% 
-    bind_rows(data.frame(Comorbidity = target[i],
-                         coef = summary(fit)$coefficients["PE", "coef"],
-                         stderr = summary(fit)$coefficients["PE", "se(coef)"],
-                         pvalue = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
-}
-result_survival
-write.csv(result_survival, file = "/nfs/turbo/umms-lgarmire2/Xiaotong/result_survival_new.csv")
-
-
-figure = ggplot(data=result_survival, aes(y= Comorbidity, x=exp(coef), xmin=exp(coef-1.96*stderr), xmax=exp(coef+1.96*stderr))) +
-  theme_minimal()+
-  geom_errorbarh(height=.1)+
-  geom_point(color = "red") + 
-  geom_vline(xintercept = 1, linetype = "dashed") +
-  labs(title = "Hazard Ratios of PE", x = "Hazard Ratio", y = "Comorbidity") +
-  theme(legend.position = "none")+
-  scale_x_continuous(breaks = c(1,2,4,6))
-figure
-ggsave("/nfs/turbo/umms-lgarmire2/Xiaotong/figures/HazardRatio_new.png", height = 4.8, width = 7.2, dpi = 600)
-
-
 
 # by race---------------------------------------------------
-i=1
+target = c("HTN", "Renal")
 for (disease in target) {
   sdata = rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
   sdata = sdata%>%filter(surv_time<=3650)%>%mutate(surv_time = surv_time/365)
@@ -94,61 +64,6 @@ for (disease in target) {
 
 
 
-
-# result_survival_race = data.frame()
-# for(i in c(1:length(target))){
-#   data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
-#   fit = coxph(Surv(surv_time, status) ~ PE+PE_age+Caucasian+ PE:Caucasian+SmokingStatusMapped+AlcoholUseStatusMapped, data = data1)
-#   result_survival_race = result_survival_race %>% 
-#     bind_rows(data.frame(Comorbidity = target[i],
-#                          coef = summary(fit)$coefficients["PE:Caucasian", "coef"],
-#                          stderr = summary(fit)$coefficients["PE:Caucasian", "se(coef)"],
-#                          pvalue = summary(fit)$coefficients["PE:Caucasian", "Pr(>|z|)"]))
-# }
-# result_survival_race
-# write.csv(result_survival_race, file = "/nfs/turbo/umms-lgarmire2/Xiaotong/result_survival_race_interaction_term.csv")
-
-#caucasian
-result_survival_caucasian = data.frame()
-for(i in c(1:length(target))){
-  data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
-  data1 = data1%>%filter(Caucasian==1)
-  fit = coxph(Surv(surv_time, status) ~ PE+PE_age+SmokingStatusMapped+AlcoholUseStatusMapped, data = data1)
-  result_survival_caucasian  = result_survival_caucasian  %>% 
-    bind_rows(data.frame(Comorbidity = target[i],
-                         coef = summary(fit)$coefficients["PE", "coef"],
-                         stderr = summary(fit)$coefficients["PE", "se(coef)"],
-                         pvalue = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
-}
-result_survival_caucasian 
-
-result_survival_AA = data.frame()
-for(i in c(1:length(target))){
-  data1 <- rbind(case_survival_list[[target[i]]], control_survival_list[[target[i]]])
-  data1 = data1%>%filter(`African American`==1)
-  fit = coxph(Surv(surv_time, status) ~ PE+PE_age+SmokingStatusMapped+AlcoholUseStatusMapped, data = data1)
-  result_survival_AA  = result_survival_AA  %>% 
-    bind_rows(data.frame(Comorbidity = target[i],
-                         coef = summary(fit)$coefficients["PE", "coef"],
-                         stderr = summary(fit)$coefficients["PE", "se(coef)"],
-                         pvalue = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
-}
-result_survival_AA
-
-data = as.data.frame(rbind(result_survival_caucasian,result_survival_AA))
-data$race = c(rep("Caucasian", 6), rep("AA", 6))
-data
-figure2 = ggplot(data=data, aes(y= Comorbidity, x=exp(coef), xmin=exp(coef-1.96*stderr), xmax=exp(coef+1.96*stderr), color = race, group = race)) +
-  theme_minimal()+
-  geom_errorbarh(height=0.2, position = position_dodge(width = 0.5))+
-  geom_pointrange(position = position_dodge(width = 0.5), size = 0.15) +
-  geom_vline(xintercept = 1, linetype = "dashed") +
-  labs(title = "Hazard Ratios of PE", x = "Hazard Ratio", y = "Comorbidity") +
-  scale_x_continuous(breaks = c(1,2,4,6)) 
-figure2
-
-ggsave("/nfs/turbo/umms-lgarmire2/Xiaotong/figures/HazardRatio_race.png", height = 4.8, width = 7.2, dpi = 600)
-
 #3. by severity------------------------------------------------------
 library(icd)
 library(touch)
@@ -177,8 +92,6 @@ mild_pe = diag_convert %>%
   slice(1)
 
 #survival curves
-target = c("HTN", "DMcx", "DM", "Renal", "Obesity", "Hypothyroid")
-i=1
 for (disease in target) {
   severe = case_survival_list[[target[i]]]%>%inner_join(severe_pe)%>%mutate(group = "severe")
   mild = case_survival_list[[target[i]]]%>%inner_join(mild_pe)%>%mutate(group = "mild")
@@ -207,78 +120,3 @@ for (disease in target) {
 }
 
 
-#hazard ratio
-result_survival_severe = data.frame()
-for(i in c(1:length(target))){
-  case = case_survival_list[[target[i]]]%>%inner_join(severe_pe)
-  data1 <- rbind(case, control_survival_list[[target[i]]])
-  fit = coxph(Surv(surv_time, status) ~ PE+PE_age+Caucasian+SmokingStatusMapped+
-                AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated + 
-                Hypothyroidism + Obesity + RenalFailure + CongestiveHeartFailure, data = data1)
-  result_survival_severe  = result_survival_severe  %>% 
-    bind_rows(data.frame(Comorbidity = target[i],
-                         coef = summary(fit)$coefficients["PE", "coef"],
-                         stderr = summary(fit)$coefficients["PE", "se(coef)"],
-                         pvalue = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
-}
-result_survival_severe 
-
-result_survival_mild = data.frame()
-for(i in c(1:length(target))){
-  case = case_survival_list[[target[i]]]%>%inner_join(mild_pe)
-  data1 <- rbind(case, control_survival_list[[target[i]]])
-  fit = coxph(Surv(surv_time, status) ~ PE+PE_age+Caucasian+SmokingStatusMapped+
-                AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated + 
-                Hypothyroidism + Obesity + RenalFailure + CongestiveHeartFailure, data = data1)
-  result_survival_mild  = result_survival_mild  %>% 
-    bind_rows(data.frame(Comorbidity = target[i],
-                         coef = summary(fit)$coefficients["PE", "coef"],
-                         stderr = summary(fit)$coefficients["PE", "se(coef)"],
-                         pvalue = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
-}
-result_survival_mild
-
-data = as.data.frame(rbind(result_survival_severe,result_survival_mild))
-data$Severity = c(rep("severe", 6), rep("mild", 6))
-data
-figure3 = ggplot(data=data, aes(y= Comorbidity, x=exp(coef), xmin=exp(coef-1.96*stderr), xmax=exp(coef+1.96*stderr), color = Severity, group = Severity)) +
-  theme_minimal()+
-  geom_errorbarh(height=0.2, position = position_dodge(width = 0.5))+
-  geom_pointrange(position = position_dodge(width = 0.5), size = 0.15) +
-  geom_vline(xintercept = 1, linetype = "dashed") +
-  labs(title = "Hazard Ratios of PE", x = "Hazard Ratio", y = "Comorbidity") +
-  scale_x_continuous(breaks = c(1,2,4,6)) 
-figure3
-
-ggsave("/nfs/turbo/umms-lgarmire2/Xiaotong/figures/HazardRatio_severity.png", height = 4.8, width = 7.2, dpi = 600)
-
-
-#recurrent pe--------------------------------------------------------
-# check how many patients have multiple pe
-# all_pe = diag_convert %>%
-#   filter(grepl("O14", TermCodeMapped))%>%
-#   filter(!grepl("O14.2", TermCodeMapped)) 
-# all_pe = all_pe%>%left_join(encounter)
-# tbl = all_pe%>%select(DeID_PatientID, AgeInYears)%>%group_by(DeID_PatientID)%>%summarise(earliest = min(AgeInYears))
-# tbl2 = all_pe%>%left_join(tbl)%>%mutate(diff = AgeInYears-earliest)%>%group_by(DeID_PatientID)%>%summarise(multi = diff>1)
-# tbl2 = tbl2%>%group_by(DeID_PatientID)%>%summarise(multiple_pe = any(multi == TRUE))
-# recurrent_pe = tbl2%>%filter(multiple_pe == TRUE)%>%select(DeID_PatientID)
-# 
-# final_recurrent_pe = case_survival_list$HTN%>%inner_join(recurrent_pe)#592 patients
-# 
-# #hazard ratio
-# result_survival_recurrent = data.frame()
-# i=1
-# for(i in c(1:length(target))){
-#   case = case_survival_list[[target[i]]]%>%inner_join(recurrent_pe)
-#   data1 <- rbind(case, control_survival_list[[target[i]]])
-#   fit = coxph(Surv(surv_time, status) ~ PE+PE_age+Caucasian+SmokingStatusMapped+
-#                 AlcoholUseStatusMapped+DiabetesComplicated + HypertensionUncomplicated + 
-#                 Hypothyroidism + Obesity + RenalFailure+DiabetesUncomplicated, data = data1)
-#   result_survival_recurrent  = result_survival_recurrent  %>% 
-#     bind_rows(data.frame(Comorbidity = target[i],
-#                          coef = summary(fit)$coefficients["PE", "coef"],
-#                          stderr = summary(fit)$coefficients["PE", "se(coef)"],
-#                          pvalue = summary(fit)$coefficients["PE", "Pr(>|z|)"]))
-# }
-# result_survival_recurrent
